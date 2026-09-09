@@ -1,14 +1,25 @@
 import { useEffect, useRef } from "react";
 import { CaretDown, CaretUp, Clock, SlidersHorizontal, Scissors } from "@phosphor-icons/react";
 import { AppointmentCard } from "./AppointmentCard.jsx";
+import { MobileDayAgenda } from "./MobileDayAgenda.jsx";
 import { useAppActions, useAppState } from "../store/AppContext.jsx";
 import { addDays, NOW, dateKey, DAY_END_MIN, DAY_START_MIN, formatClock, formatRange, minutesSinceMidnight, sameDay } from "../lib/format.js";
 import { minutesToPx, PX_PER_HOUR, pxToMinutes, PX_PER_MIN, SCHEDULE_HEIGHT, snapAndClamp } from "../lib/geometry.js";
 import { layoutDay, mergedBusyIntervals } from "../lib/scheduling.js";
+import { useIsMobile } from "../lib/useIsMobile.js";
 
 const HOURS = Array.from({ length: (DAY_END_MIN - DAY_START_MIN) / 60 }, (_, i) => DAY_START_MIN + i * 60);
 
+// The two-lane, minute-precise grid below needs real width to stay readable — swap to a plain
+// chronological list on phones instead (see MobileDayAgenda.jsx) rather than shrinking or
+// side-scrolling a layout that was never meant to fit in ~350px. Kept as a thin wrapper (one
+// hook) so the grid's own hooks stay unconditional regardless of which branch renders.
 export function DayView({ date }) {
+  const isMobile = useIsMobile();
+  return isMobile ? <MobileDayAgenda date={date} /> : <DesktopDayGrid date={date} />;
+}
+
+function DesktopDayGrid({ date }) {
   const { appointments, ui } = useAppState();
   const actions = useAppActions();
   const key = dateKey(date);

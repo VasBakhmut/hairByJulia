@@ -312,11 +312,13 @@
 .conflict-preview svg{flex-shrink:0;width:16px;height:16px;margin-top:1px;color:#c0524f}
 
 /* ==========================================================================
-   Mobile (phones, ≤760px) — the day grid keeps its exact desktop math (same
-   lane widths, same precision) and just scrolls sideways instead of being
-   squeezed into unreadable columns; everything else (nav, forms, modals,
-   lists) genuinely reflows to full width. Kept CSS-only on purpose — no
-   component logic changes, so nothing already working risks breaking.
+   Mobile (phones, ≤760px) — nav, forms, and modals genuinely reflow to full
+   width here. The day grid is handled separately: below the same breakpoint
+   (see useIsMobile.js) DayView swaps in MobileDayAgenda, a plain list, since
+   no amount of CSS keeps a two-lane minute-precise grid readable at ~350px.
+   Week/Month (reachable via the calendar-icon button even though the view
+   switcher is hidden) still just scroll sideways — lower priority, rarely
+   reached on a phone.
    ========================================================================== */
 @media(max-width:760px){
   body{min-width:0}
@@ -347,16 +349,8 @@
   .content{display:block;padding:0 12px 12px}
   .assistant{position:fixed;inset:0;z-index:20;width:100%;height:100dvh;border:0;padding:16px 16px calc(16px + 60px)}
 
-  /* Calendar: drop the decorative sub-labels and the precision ruler to save
-     vertical space; the grid itself keeps its real width and scrolls
-     sideways rather than cramming two lanes into a few centimetres. */
-  .calendar-head small{display:none}
-  .snap{display:none}
-  .schedule{overflow-x:auto}
-  .schedule-inner{min-width:600px}
-  .precision-ruler{display:none}
-
-  /* Week/Month grids: same idea — scroll sideways rather than reflow. */
+  /* Week/Month grids: scroll sideways rather than reflow (Day view has its
+     own dedicated mobile layout instead — see .agenda below). */
   .multi-calendar,.month-calendar{overflow-x:auto}
   .multi-head,.multi-body{min-width:600px}
   .weekday-row,.month-grid{min-width:600px}
@@ -364,8 +358,52 @@
   /* Full-page views (Clients/Messages/Finances) — generous desktop padding
      shrinks, headers wrap instead of overflowing. */
   .page-view{padding:18px 14px 78px}
+  /* flex-basis:100% forces the search box onto its own full-width row instead of fighting the
+     action buttons for space and getting squeezed down to almost nothing. */
   .page-view-head{flex-wrap:wrap}
-  .page-search{max-width:100%}
+  .page-search{flex:1 1 100%;max-width:100%}
+  .finance-head{flex-wrap:wrap;gap:12px}
   .finance-stats{grid-template-columns:1fr}
   .exact-time-row{grid-template-columns:1fr}
+
+  /* The booking footer's sticky-bottom math was tuned for the desktop side
+     panel; in the full-screen mobile sheet it "sticks" almost immediately
+     and lands on top of the suggested-times list instead of below it. On a
+     phone, scrolling to a plain in-flow button at the end is normal and
+     unambiguous anyway — simpler than fighting the offset math. */
+  .assistant-footer{position:static;margin:20px 0 0;padding:14px 0 0}
 }
+
+/* ==========================================================================
+   Mobile day agenda (MobileDayAgenda.jsx) — same appointment data as the
+   desktop grid, rendered as a plain chronological list. Only ever mounted
+   below the mobile breakpoint (see useIsMobile.js), so this needs no media
+   query of its own.
+   ========================================================================== */
+.calendar-card.agenda{padding:0 12px}
+/* prev/next-day buttons live outside the scrollable .agenda-list here (unlike the desktop
+   grid, where they sit inside .schedule) — their sticky positioning has no scrolling ancestor
+   to stick within in this layout and was overlapping the last card instead of sitting below it. */
+.calendar-card.agenda>.prev-day-jump,.calendar-card.agenda>.next-day-jump{position:static}
+.agenda-list{flex:1;min-height:0;overflow-y:auto;padding:4px 0 16px}
+.agenda-item{position:relative;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:0 0 10px;cursor:pointer}
+.agenda-item.agenda-cancelled{background:#f3f1ef;border-color:#ddd7d3;color:#71696d}
+.agenda-item.agenda-cancelled .agenda-item-title,.agenda-item.agenda-cancelled .agenda-item-head b{text-decoration:line-through;opacity:.75}
+.agenda-item.agenda-proposed{border:1px dashed #ac5c99;background:#fff}
+.agenda-item.agenda-private{background:#f0eaf2;border-color:#c9b4d0}
+.agenda-item.conflict{border:1.5px dashed #c0524f}
+.agenda-item-head{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.agenda-item-head b{font-size:13px}
+.agenda-status{display:flex;align-items:center;gap:4px;font-size:10px;font-weight:600;color:#8b8085;margin-left:auto}
+.agenda-item-title{font-size:13.5px}
+.agenda-item-title i{font-style:normal;color:#a07e82;margin:0 4px}
+.agenda-stages{display:grid;gap:5px;margin:10px 0 2px;padding:8px;background:#fdfbf9;border-radius:8px}
+.agenda-stage{display:grid;grid-template-columns:16px 1fr auto;align-items:center;gap:8px;font-size:11px;padding:4px 2px}
+.agenda-stage svg{width:14px;height:14px}
+.agenda-stage.hands{color:#7a3d2e}
+.agenda-stage.process{color:#5c6b52}
+.agenda-item-controls{display:flex;gap:6px;margin-top:9px}
+.conflict-badge.inline{position:static;width:auto;height:auto;background:transparent;border:0;color:#c0524f}
+.conflict-badge.inline svg{width:15px;height:15px}
+.agenda-now{display:flex;align-items:center;gap:8px;margin:10px 2px;color:var(--wine);font-size:11px;font-weight:600}
+.agenda-now:before,.agenda-now:after{content:'';flex:1;height:1px;background:var(--wine);opacity:.35}
