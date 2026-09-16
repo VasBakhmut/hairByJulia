@@ -319,9 +319,9 @@
 .recall-hint b{color:#5a4d1e}
 .exact-time{border-top:1px solid var(--line);margin-top:12px;padding-top:12px}
 .exact-time>small{display:block;color:#81767b;font-size:10px;margin-bottom:7px}
-.exact-time-row{display:grid;grid-template-columns:1fr 1fr auto;gap:6px}
+.exact-time-row{display:grid;grid-template-columns:1fr;gap:6px}
 .exact-time-row input{height:36px;border:1px solid #ddd3cd;border-radius:5px;padding:0 8px;font-size:12px;width:100%}
-.exact-time-row button{border:1px solid #dcd2cc;background:#fff;border-radius:5px;padding:0 12px;font-size:11.5px;font-weight:600;white-space:nowrap}
+.exact-time-row button{border:1px solid #dcd2cc;background:#fff;border-radius:5px;padding:0 12px;height:36px;width:100%;font-size:11.5px;font-weight:600;white-space:nowrap}
 .conflict-preview{display:flex;align-items:flex-start;gap:8px;background:#fbecea;border:1px solid #e3b3ae;border-radius:6px;padding:10px;margin-top:12px;font-size:11px;line-height:1.45;color:#7a3530}
 .conflict-preview svg{flex-shrink:0;width:16px;height:16px;margin-top:1px;color:#c0524f}
 
