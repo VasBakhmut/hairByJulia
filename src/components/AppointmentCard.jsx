@@ -174,12 +174,15 @@ export function AppointmentCard({ appointment, lane }) {
         <>
           {/* Overlaid, not stacked in flow — the card's height is exactly the sum of phase
               durations (so it lands precisely on the time grid), so the title can't add its
-              own height on top without pushing the last phase past the card's bottom edge. */}
+              own height on top without pushing the last phase past the card's bottom edge. The
+              overall-range badge only renders when the controls (reminder/reschedule/cancel)
+              aren't — both want the same top-right corner, and the range is already readable
+              from the first and last phase rows, so it's the one that gives way. */}
           <div className="booking-title-overlay">
             <b>
               {client.name} <i>—</i> <em>{appointment.serviceLabel}</em>
             </b>
-            <span>{formatRange(appointment.startMin, appointment.startMin + duration)}</span>
+            {!showControls && <span>{formatRange(appointment.startMin, appointment.startMin + duration)}</span>}
           </div>
           {stagesWithOffsets(appointment).map((stage) => (
             <div

@@ -41,7 +41,17 @@ export function RescheduleModal() {
   const conflict = date && hasValidTime && !unchanged ? findConflictingAppointment(appointments, { ...appointment, date }, newStartMin) : null;
   const conflictClient = conflict ? clients.find((c) => c.id === conflict.clientId) : null;
 
-  function close() {
+  // Typing a new date jumps the actual day underneath live — the modal only dims the calendar
+  // (34% backdrop), it doesn't hide it — so she's looking at the real day, not a text summary,
+  // while she picks the time. Backing out without saving snaps the calendar back to wherever it
+  // was before this preview.
+  function changeDate(value) {
+    setDate(value);
+    if (value) actions.setSelectedDate(keyToDate(value));
+  }
+
+  function cancel() {
+    if (date !== appointment.date) actions.setSelectedDate(keyToDate(appointment.date));
     actions.closeReschedule();
   }
 
@@ -53,7 +63,7 @@ export function RescheduleModal() {
     actions.rescheduleAppointment(appointment.id, date, newStartMin, conflict ? "parallel" : "primary");
     actions.setSelectedDate(keyToDate(date));
     actions.setScrollTarget(appointment.id);
-    close();
+    actions.closeReschedule();
     announce(
       conflict
         ? `Moved ${client.name} to ${formatDayLabel(date)} · ${formatClock(newStartMin)} — double-booked with ${conflictClient?.name ?? "another client"}`
@@ -62,9 +72,9 @@ export function RescheduleModal() {
   }
 
   return (
-    <Modal open={open} onClose={close} title={`Reschedule ${client.name}`} width={380}>
+    <Modal open={open} onClose={cancel} title={`Reschedule ${client.name}`} width={380}>
       <label className="field-label">New date</label>
-      <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+      <input type="date" value={date} onChange={(e) => changeDate(e.target.value)} />
       <label className="field-label">New time</label>
       <input type="time" step="300" value={time} onChange={(e) => setTime(e.target.value)} />
       {conflict && (

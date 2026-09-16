@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CaretRight, Check, Clock, ClockCounterClockwise, MapPinLine, Scissors, Sparkle, Stack, WarningCircle, X } from "@phosphor-icons/react";
+import { CaretRight, Clock, ClockCounterClockwise, MapPinLine, Scissors, Sparkle, Stack, WarningCircle, X } from "@phosphor-icons/react";
 import { useAppActions, useAppState, useAnnounce } from "../store/AppContext.jsx";
 import { NOW, dateKey, durationLabel, formatDayLabel, formatRange, keyToDate } from "../lib/format.js";
 import { snapAndClamp } from "../lib/geometry.js";
@@ -71,16 +71,6 @@ export function FindTimeAssistant() {
 
   const slots = useMemo(() => searchAvailability(appointments, duration, NOW, { daysAhead: 14, limit: 8 }), [appointments, duration]);
 
-  // Picking a date below re-anchors the suggested list to that specific day instead of leaving
-  // it showing the generic soonest-first list — "when you pick a date, the suggestions should
-  // change to that day."
-  const exactDaySlots = useMemo(() => {
-    if (!exactDate) return null;
-    const d = keyToDate(exactDate);
-    return searchAvailability(appointments, duration, new Date(d.getFullYear(), d.getMonth(), d.getDate()), { daysAhead: 1, limit: 8 });
-  }, [exactDate, appointments, duration]);
-  const displaySlots = exactDaySlots ?? slots;
-
   const clientMatches = useMemo(() => {
     const q = clientQuery.trim().toLowerCase();
     const sorted = [...clients].sort((a, b) => a.name.localeCompare(b.name));
@@ -127,10 +117,6 @@ export function FindTimeAssistant() {
     setSelectedSlot(null);
   };
   const applyManual = () => pickDuration(Math.max(5, hours * 60 + minutes));
-  // Feedback for "Use this duration" — it really was doing something, it just gave no visible
-  // sign of it when the typed value already matched what's active. Disable + relabel once applied
-  // instead of leaving a button that always looks clickable and never looks like it did anything.
-  const manualApplied = hours * 60 + minutes === duration;
 
   function toggleMultiStep(on) {
     setMultiStep(on);
@@ -165,6 +151,14 @@ export function FindTimeAssistant() {
       pickDuration(appointmentDuration(pastAppt));
     }
     if (!serviceQuery.trim()) setServiceQuery(pastAppt.serviceLabel);
+  }
+
+  // Picking a date jumps the real calendar (visible right next to this panel on desktop) to
+  // that day live, so she's looking at the actual schedule — not a re-derived text list that
+  // can drift out of sync with what "that day" even means — while she settles on a time.
+  function changeExactDate(value) {
+    setExactDate(value);
+    if (value) actions.setSelectedDate(keyToDate(value));
   }
 
   function useExactTime() {
@@ -293,19 +287,35 @@ export function FindTimeAssistant() {
               <span>Or enter manually</span>
               <span>5-minute steps</span>
             </div>
-            <div className={`manual-time ${manualApplied ? "active" : ""}`}>
+            {/* Applies the moment you finish — tab or click away, or press Enter — same as
+                tapping a quick-duration chip above. No separate confirm step to explain. */}
+            <div className="manual-time">
               <label>
-                <input type="number" min="0" max="12" value={hours} onChange={(e) => setHours(+e.target.value)} />
+                <input
+                  type="number"
+                  min="0"
+                  max="12"
+                  value={hours}
+                  onChange={(e) => setHours(+e.target.value)}
+                  onBlur={applyManual}
+                  onKeyDown={(e) => e.key === "Enter" && applyManual()}
+                />
                 <span>hours</span>
               </label>
               <label>
-                <input type="number" min="0" max="55" step="5" value={minutes} onChange={(e) => setMinutes(Math.round(+e.target.value / 5) * 5)} />
+                <input
+                  type="number"
+                  min="0"
+                  max="55"
+                  step="5"
+                  value={minutes}
+                  onChange={(e) => setMinutes(Math.round(+e.target.value / 5) * 5)}
+                  onBlur={applyManual}
+                  onKeyDown={(e) => e.key === "Enter" && applyManual()}
+                />
                 <span>min</span>
               </label>
             </div>
-            <button className="primary wide" disabled={manualApplied} onClick={applyManual}>
-              {manualApplied ? <><Check /> Applied</> : "Use this duration"}
-            </button>
           </>
         ) : (
           <div className="stage-editor">
@@ -336,11 +346,7 @@ export function FindTimeAssistant() {
           <b>Pick a time</b>
         </div>
         <div className="suggested">
-          <small>
-            {exactDate
-              ? `Open times on ${formatDayLabel(exactDate)}`
-              : `${durationLabel(duration)} · double-booking opportunities marked`}
-          </small>
+          <small>{durationLabel(duration)} · double-booking opportunities marked</small>
           {prefill?.slot && selectedSlot?.pinned && (
             <button className="selected-slot pinned" onClick={() => setSelectedSlot(selectedSlot)}>
               <MapPinLine />
@@ -351,10 +357,8 @@ export function FindTimeAssistant() {
               <em>Selected</em>
             </button>
           )}
-          {displaySlots.length === 0 && (
-            <p className="empty-hint">{exactDate ? "Nothing open that day — the exact-time field below still works anyway." : "Nothing open in the next two weeks."}</p>
-          )}
-          {displaySlots.map((s, i) => {
+          {slots.length === 0 && <p className="empty-hint">Nothing open in the next two weeks.</p>}
+          {slots.map((s, i) => {
             const isSelected = selectedSlot && !selectedSlot.pinned && selectedSlot.date === s.date && selectedSlot.startMin === s.startMin;
             const overlapClient = s.overlap ? clients.find((c) => c.id === s.overlap.clientId) : null;
             return (
@@ -375,9 +379,9 @@ export function FindTimeAssistant() {
             has to fit even if it means overlapping someone. Not restricted to genuinely open
             slots like the search above; the conflict warning below covers the rest. */}
         <div className="exact-time">
-          <small>Or asked for an exact day and time?</small>
+          <small>Or asked for an exact day and time? Picking a date opens that day over on the calendar so you can see it.</small>
           <div className="exact-time-row">
-            <input type="date" value={exactDate} onChange={(e) => setExactDate(e.target.value)} />
+            <input type="date" value={exactDate} onChange={(e) => changeExactDate(e.target.value)} />
             <input type="time" step="300" value={exactTime} onChange={(e) => setExactTime(e.target.value)} />
             <button type="button" onClick={useExactTime}>Use this time</button>
           </div>
