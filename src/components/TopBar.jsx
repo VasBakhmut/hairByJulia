@@ -1,6 +1,8 @@
-import { CalendarBlank, CaretLeft, CaretRight, Plus } from "@phosphor-icons/react";
+import { useState } from "react";
+import { CalendarBlank, CaretLeft, CaretRight, MagnifyingGlass, Plus } from "@phosphor-icons/react";
 import { useAppActions, useAppState } from "../store/AppContext.jsx";
 import { addDays, NOW, formatHeader } from "../lib/format.js";
+import { ClientSearchModal } from "./ClientSearchModal.jsx";
 
 const VIEWS = ["Day", "3 Days", "Week", "Month"];
 
@@ -8,6 +10,7 @@ export function TopBar() {
   const { ui } = useAppState();
   const actions = useAppActions();
   const { view, selectedDate } = ui;
+  const [searchOpen, setSearchOpen] = useState(false);
 
   function movePeriod(direction) {
     const step = view === "Month" ? 30 : view === "Week" ? 7 : view === "3 Days" ? 3 : 1;
@@ -48,12 +51,16 @@ export function TopBar() {
             </button>
           ))}
         </div>
+        <button className="outline" onClick={() => setSearchOpen(true)}>
+          <MagnifyingGlass /> Find a client
+        </button>
         {/* One clear way in — this used to sit next to an identical "Find a time" button, which
             just made it look like there were two different things to choose between. */}
         <button className="primary" onClick={() => actions.openAssistant()}>
           <Plus /> New booking
         </button>
       </div>
+      <ClientSearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
     </header>
   );
 }

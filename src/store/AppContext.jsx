@@ -52,6 +52,7 @@ function initialState() {
       selectedAppointmentId: null,
       placementMode: null,
       scrollToAppointmentId: null,
+      reschedulingAppointmentId: null,
       dragPreview: null, // { dayKey, startMin, endMin } while a card is being dragged — lets
       // DayView draw one shared guide line across the whole grid, not just under the card.
       toast: "",
@@ -102,7 +103,9 @@ function reducer(state, action) {
       return {
         ...state,
         appointments: state.appointments.map((a) =>
-          a.id === action.payload.id ? { ...a, date: action.payload.date, startMin: action.payload.startMin } : a
+          a.id === action.payload.id
+            ? { ...a, date: action.payload.date, startMin: action.payload.startMin, ...(action.payload.lane ? { lane: action.payload.lane } : {}) }
+            : a
         ),
       };
     case "TOGGLE_PARALLEL":
@@ -196,7 +199,10 @@ function reducer(state, action) {
     }
 
     case "RESET_DATA":
-      return { ...freshData(), ui: { ...state.ui, clientPanelId: null, addClientOpen: false, threadClientId: null, assistantPrefill: null, placementMode: null } };
+      return {
+        ...freshData(),
+        ui: { ...state.ui, clientPanelId: null, addClientOpen: false, threadClientId: null, assistantPrefill: null, placementMode: null, reschedulingAppointmentId: null },
+      };
 
     case "SET_PAGE":
       return { ...state, ui: { ...state.ui, page: action.payload } };
@@ -241,6 +247,10 @@ function reducer(state, action) {
       return { ...state, ui: { ...state.ui, scrollToAppointmentId: action.payload } };
     case "SET_DRAG_PREVIEW":
       return { ...state, ui: { ...state.ui, dragPreview: action.payload } };
+    case "OPEN_RESCHEDULE":
+      return { ...state, ui: { ...state.ui, reschedulingAppointmentId: action.payload } };
+    case "CLOSE_RESCHEDULE":
+      return { ...state, ui: { ...state.ui, reschedulingAppointmentId: null } };
     case "TOAST":
       return { ...state, ui: { ...state.ui, toast: action.payload } };
     default:
@@ -284,7 +294,7 @@ export function useAppActions() {
         dispatch({ type: "ADD_APPOINTMENT", payload: { ...payload, id } });
         return id;
       },
-      rescheduleAppointment: (id, date, startMin) => dispatch({ type: "RESCHEDULE_APPOINTMENT", payload: { id, date, startMin } }),
+      rescheduleAppointment: (id, date, startMin, lane) => dispatch({ type: "RESCHEDULE_APPOINTMENT", payload: { id, date, startMin, lane } }),
       toggleParallel: (id) => dispatch({ type: "TOGGLE_PARALLEL", payload: { id } }),
       cancelAppointment: (id) => dispatch({ type: "CANCEL_APPOINTMENT", payload: { id } }),
       restoreAppointment: (id) => dispatch({ type: "RESTORE_APPOINTMENT", payload: { id } }),
@@ -326,6 +336,8 @@ export function useAppActions() {
       endPlacement: () => dispatch({ type: "END_PLACEMENT" }),
       setScrollTarget: (id) => dispatch({ type: "SET_SCROLL_TARGET", payload: id }),
       setDragPreview: (preview) => dispatch({ type: "SET_DRAG_PREVIEW", payload: preview }),
+      openReschedule: (id) => dispatch({ type: "OPEN_RESCHEDULE", payload: id }),
+      closeReschedule: () => dispatch({ type: "CLOSE_RESCHEDULE" }),
       toast: (message) => dispatch({ type: "TOAST", payload: message }),
     }),
     [dispatch]

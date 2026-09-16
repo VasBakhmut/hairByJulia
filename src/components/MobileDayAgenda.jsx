@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { BellRinging, CaretDown, CaretUp, Check, Clock, LockSimple, LockSimpleOpen, Scissors, WarningCircle, X } from "@phosphor-icons/react";
+import { ArrowsClockwise, BellRinging, CaretDown, CaretUp, Check, Clock, LockSimple, LockSimpleOpen, Scissors, WarningCircle, X } from "@phosphor-icons/react";
 import { useAppActions, useAppState, useAnnounce } from "../store/AppContext.jsx";
 import { addDays, NOW, dateKey, formatClock, formatRange, minutesSinceMidnight, sameDay } from "../lib/format.js";
 import { appointmentEndMin, findConflictingAppointment, layoutDay, stagesWithOffsets } from "../lib/scheduling.js";
@@ -111,6 +111,10 @@ function AgendaItem({ appointment }) {
     e.stopPropagation();
     actions.restoreAppointment(appointment.id);
   }
+  function handleReschedule(e) {
+    e.stopPropagation();
+    actions.openReschedule(appointment.id);
+  }
   function handleFreeStageClick(e, stage) {
     e.stopPropagation();
     if (isPrivate) {
@@ -184,6 +188,9 @@ function AgendaItem({ appointment }) {
               {isPrivate ? <LockSimple /> : <LockSimpleOpen />}
             </button>
           )}
+          <button className="chip-btn" title="Reschedule — change the date or time" onClick={handleReschedule}>
+            <ArrowsClockwise />
+          </button>
           <button className="chip-btn danger" title="Cancel appointment" onClick={handleCancel}>
             <X />
           </button>

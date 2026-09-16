@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { BellRinging, Check, Clock, LockSimple, LockSimpleOpen, Scissors, WarningCircle, X } from "@phosphor-icons/react";
+import { ArrowsClockwise, BellRinging, Check, Clock, LockSimple, LockSimpleOpen, Scissors, WarningCircle, X } from "@phosphor-icons/react";
 import { useAppActions, useAppState, useAnnounce } from "../store/AppContext.jsx";
 import { formatClock, formatRange, relativeTimeFromNow } from "../lib/format.js";
 import { minutesToPx, PX_PER_MIN, snapAndClamp } from "../lib/geometry.js";
@@ -98,8 +98,12 @@ export function AppointmentCard({ appointment, lane }) {
     // Move it regardless — Julia sometimes deliberately wants to overlap two clients for a few
     // minutes. If it does land on someone else, say so clearly instead of silently allowing it;
     // the card itself then carries a warning badge until one of them is moved clear.
-    actions.rescheduleAppointment(appointment.id, appointment.date, target);
     const landedOn = findConflictingAppointment(appointments, appointment, target);
+    // The lane isn't just wherever it was booked — it's re-decided on every move. Land somewhere
+    // clear and it becomes the main thread of the day (primary); land on someone else's downtime
+    // and it's a squeeze (parallel), same rule new bookings use. Without this, a card dragged out
+    // of a squeeze into open space stayed stuck in the narrow side column forever.
+    actions.rescheduleAppointment(appointment.id, appointment.date, target, landedOn ? "parallel" : "primary");
     if (landedOn) {
       const other = clients.find((c) => c.id === landedOn.clientId);
       announce(`Moved ${client.name} to ${formatClock(target)} — double-booked with ${other?.name ?? "another client"}`);
@@ -130,6 +134,11 @@ export function AppointmentCard({ appointment, lane }) {
   function handleRestore(e) {
     e.stopPropagation();
     actions.restoreAppointment(appointment.id);
+  }
+
+  function handleReschedule(e) {
+    e.stopPropagation();
+    actions.openReschedule(appointment.id);
   }
 
   function handleFreeStageClick(e, stage) {
@@ -231,6 +240,9 @@ export function AppointmentCard({ appointment, lane }) {
               {isPrivate ? <LockSimple /> : <LockSimpleOpen />}
             </button>
           )}
+          <button className="chip-btn" title="Reschedule — change the date or time" onClick={handleReschedule}>
+            <ArrowsClockwise />
+          </button>
           <button className="chip-btn danger" title="Cancel appointment" onClick={handleCancel}>
             <X />
           </button>

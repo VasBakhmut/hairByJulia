@@ -14,6 +14,7 @@ import { AddClientModal } from "./components/AddClientModal.jsx";
 import { FinanceView } from "./components/FinanceView.jsx";
 import { MessagesView } from "./components/MessagesView.jsx";
 import { MessageThreadModal } from "./components/MessageThreadModal.jsx";
+import { RescheduleModal } from "./components/RescheduleModal.jsx";
 
 export function App() {
   return (
@@ -75,6 +76,7 @@ function Shell() {
       <ClientProfilePanel />
       <AddClientModal />
       <MessageThreadModal />
+      <RescheduleModal />
 
       {ui.toast && (
         <div className="toast">
