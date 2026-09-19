@@ -86,11 +86,31 @@ export function FindTimeAssistant() {
 
   const matchingClient = clients.find((c) => c.name.toLowerCase() === clientQuery.trim().toLowerCase());
 
+  // Anything Julia has ever typed as a service that isn't already on the price list gets
+  // remembered too — a custom service only has to be typed once, then it autocompletes like any
+  // other from then on. No separate "save this service" step; past appointments already persist,
+  // this just also reads them as a second source for the dropdown.
+  const customServices = useMemo(() => {
+    const known = new Set(ALL_SERVICES.map((s) => s.name.toLowerCase()));
+    const seen = new Set();
+    const out = [];
+    for (const a of appointments) {
+      const label = a.serviceLabel?.trim();
+      if (!label) continue;
+      const key = label.toLowerCase();
+      if (known.has(key) || seen.has(key)) continue;
+      seen.add(key);
+      out.push({ name: label });
+    }
+    return out;
+  }, [appointments]);
+  const serviceOptions = useMemo(() => [...ALL_SERVICES, ...customServices], [customServices]);
+
   const serviceMatches = useMemo(() => {
     const q = serviceQuery.trim().toLowerCase();
-    if (!q) return ALL_SERVICES.slice(0, 8);
-    return ALL_SERVICES.filter((s) => s.name.toLowerCase().includes(q)).slice(0, 8);
-  }, [serviceQuery]);
+    if (!q) return serviceOptions;
+    return serviceOptions.filter((s) => s.name.toLowerCase().includes(q));
+  }, [serviceQuery, serviceOptions]);
 
   // "How long does this actually take Anna" isn't a generic service preset — it's whatever it
   // took her last time (thick hair processes longer, fine hair less). Surface it as a one-tap
@@ -282,7 +302,6 @@ export function FindTimeAssistant() {
               {serviceMatches.map((s) => (
                 <button key={s.name} onMouseDown={() => pickService(s)}>
                   {s.name}
-                  <small> · {s.price}</small>
                 </button>
               ))}
             </div>
