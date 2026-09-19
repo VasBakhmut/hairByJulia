@@ -125,6 +125,10 @@ function reducer(state, action) {
         ...state,
         appointments: state.appointments.map((a) => (a.id === action.payload.id ? { ...a, status: "confirmed" } : a)),
       };
+    case "DELETE_APPOINTMENT":
+      // Cancel just marks it cancelled (still visible, with a Restore option) — this actually
+      // removes it, for once she's sure she doesn't need it hanging around any more.
+      return { ...state, appointments: state.appointments.filter((a) => a.id !== action.payload.id) };
     case "SEND_REMINDER": {
       const appt = state.appointments.find((a) => a.id === action.payload.id);
       if (!appt) return state;
@@ -298,6 +302,7 @@ export function useAppActions() {
       toggleParallel: (id) => dispatch({ type: "TOGGLE_PARALLEL", payload: { id } }),
       cancelAppointment: (id) => dispatch({ type: "CANCEL_APPOINTMENT", payload: { id } }),
       restoreAppointment: (id) => dispatch({ type: "RESTORE_APPOINTMENT", payload: { id } }),
+      deleteAppointment: (id) => dispatch({ type: "DELETE_APPOINTMENT", payload: { id } }),
       sendReminder: (id) => dispatch({ type: "SEND_REMINDER", payload: { id } }),
 
       addClient: (payload) => {

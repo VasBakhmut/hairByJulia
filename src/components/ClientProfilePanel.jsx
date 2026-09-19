@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CalendarPlus, CaretDown, ChatCircleDots, EnvelopeSimple, LockSimple, LockSimpleOpen, MagnifyingGlass, PencilSimple, Phone, Plus, X } from "@phosphor-icons/react";
+import { CalendarPlus, CaretDown, ChatCircleDots, CreditCard, EnvelopeSimple, LockSimple, LockSimpleOpen, MagnifyingGlass, Money, PencilSimple, Phone, Plus, X } from "@phosphor-icons/react";
 import { useAppActions, useAppState } from "../store/AppContext.jsx";
 import { NOW, dateKey, formatShortDate } from "../lib/format.js";
 
@@ -109,7 +109,7 @@ function ClientPanelContent({
   const filteredVisits = q ? client.visits.filter((v) => v.service.toLowerCase().includes(q) || v.formula.toLowerCase().includes(q)) : client.visits;
 
   function handleLogToday() {
-    const id = actions.addVisit(client.id, { date: dateKey(NOW), service: "", formula: "" });
+    const id = actions.addVisit(client.id, { date: dateKey(NOW), service: "", formula: "", amount: "", method: "card" });
     setExpandedVisitId(id);
     setFreshVisitId(id);
   }
@@ -208,7 +208,10 @@ function ClientPanelContent({
             <div className="formula-callout">
               <div className="formula-callout-head">
                 <b>{latest.service || "Untitled visit"}</b>
-                <span>{formatShortDate(latest.date)}</span>
+                <span>
+                  {latest.amount ? `$${latest.amount} · ` : ""}
+                  {formatShortDate(latest.date)}
+                </span>
               </div>
               <p>{latest.formula || <em>No formula logged yet.</em>}</p>
             </div>
@@ -293,14 +296,24 @@ function VisitCard({ visit, clientId, isLatest, expanded, onToggle, autoEdit }) 
   const [editing, setEditing] = useState(autoEdit);
   const [service, setService] = useState(visit.service);
   const [formula, setFormula] = useState(visit.formula);
+  const [amount, setAmount] = useState(visit.amount ?? "");
+  const [method, setMethod] = useState(visit.method ?? "card");
 
   useEffect(() => {
     setService(visit.service);
     setFormula(visit.formula);
-  }, [visit.service, visit.formula]);
+    setAmount(visit.amount ?? "");
+    setMethod(visit.method ?? "card");
+  }, [visit.service, visit.formula, visit.amount, visit.method]);
 
   function save() {
-    actions.updateVisit(clientId, visit.id, { service, formula });
+    const amountNum = parseFloat(amount);
+    actions.updateVisit(clientId, visit.id, {
+      service,
+      formula,
+      amount: Number.isNaN(amountNum) ? "" : Math.round(amountNum * 100) / 100,
+      method,
+    });
     setEditing(false);
   }
 
@@ -312,7 +325,10 @@ function VisitCard({ visit, clientId, isLatest, expanded, onToggle, autoEdit }) 
             {visit.service || <em>Untitled visit</em>}
             {isLatest && <em className="latest-tag">Latest</em>}
           </b>
-          <small>{formatShortDate(visit.date)}</small>
+          <small>
+            {formatShortDate(visit.date)}
+            {visit.amount ? ` · $${visit.amount}` : ""}
+          </small>
         </div>
         <CaretDown className={expanded ? "rotated" : ""} />
       </button>
@@ -321,6 +337,11 @@ function VisitCard({ visit, clientId, isLatest, expanded, onToggle, autoEdit }) 
           {!editing ? (
             <>
               <p>{visit.formula || <em>No formula notes.</em>}</p>
+              {visit.amount ? (
+                <p className="visit-amount-paid">
+                  {visit.method === "cash" ? <Money /> : <CreditCard />} Paid ${visit.amount} · {visit.method === "cash" ? "Cash" : "Card"}
+                </p>
+              ) : null}
               <button className="link-btn" onClick={() => setEditing(true)}>
                 <PencilSimple /> Edit
               </button>
@@ -329,6 +350,19 @@ function VisitCard({ visit, clientId, isLatest, expanded, onToggle, autoEdit }) 
             <div className="visit-edit">
               <input autoFocus={autoEdit} value={service} onChange={(e) => setService(e.target.value)} placeholder="Service" />
               <textarea rows={4} value={formula} onChange={(e) => setFormula(e.target.value)} placeholder="Formula / recipe notes…" />
+              <label className="field-label">Amount paid</label>
+              <div className="amount-input">
+                <span>$</span>
+                <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.00" />
+              </div>
+              <div className="method-row">
+                <button type="button" className={method === "card" ? "active" : ""} onClick={() => setMethod("card")}>
+                  <CreditCard /> Card
+                </button>
+                <button type="button" className={method === "cash" ? "active" : ""} onClick={() => setMethod("cash")}>
+                  <Money /> Cash
+                </button>
+              </div>
               <div className="row-actions">
                 <button onClick={() => setEditing(false)}>Cancel</button>
                 <button className="primary" onClick={save}>

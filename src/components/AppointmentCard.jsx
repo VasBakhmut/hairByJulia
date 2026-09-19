@@ -1,9 +1,9 @@
 import { useRef, useState } from "react";
-import { ArrowsClockwise, BellRinging, Check, Clock, LockSimple, LockSimpleOpen, Scissors, WarningCircle, X } from "@phosphor-icons/react";
+import { ArrowsClockwise, BellRinging, Check, Clock, LockSimple, LockSimpleOpen, Scissors, Trash, WarningCircle, X } from "@phosphor-icons/react";
 import { useAppActions, useAppState, useAnnounce } from "../store/AppContext.jsx";
 import { formatClock, formatRange, relativeTimeFromNow } from "../lib/format.js";
 import { minutesToPx, PX_PER_MIN, snapAndClamp } from "../lib/geometry.js";
-import { appointmentDuration, appointmentEndMin, findConflictingAppointment, stagesWithOffsets } from "../lib/scheduling.js";
+import { appointmentDuration, appointmentEndMin, findConflictingAppointment, isSqueezedAt, stagesWithOffsets } from "../lib/scheduling.js";
 
 export function AppointmentCard({ appointment, lane }) {
   const { appointments, clients } = useAppState();
@@ -18,6 +18,7 @@ export function AppointmentCard({ appointment, lane }) {
   const [dragMin, setDragMin] = useState(null);
   const drag = useRef(null); // { startY, originStartMin, moved, previewMin }
   const suppressClick = useRef(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   if (!client) return null;
 
@@ -99,11 +100,12 @@ export function AppointmentCard({ appointment, lane }) {
     // minutes. If it does land on someone else, say so clearly instead of silently allowing it;
     // the card itself then carries a warning badge until one of them is moved clear.
     const landedOn = findConflictingAppointment(appointments, appointment, target);
-    // The lane isn't just wherever it was booked — it's re-decided on every move. Land somewhere
-    // clear and it becomes the main thread of the day (primary); land on someone else's downtime
-    // and it's a squeeze (parallel), same rule new bookings use. Without this, a card dragged out
-    // of a squeeze into open space stayed stuck in the narrow side column forever.
-    actions.rescheduleAppointment(appointment.id, appointment.date, target, landedOn ? "parallel" : "primary");
+    // The lane isn't just wherever it was booked — it's re-decided on every move. Landing inside
+    // *anyone's* free/processing stage is still a squeeze (parallel), conflict or not — dragging
+    // a parallel booking a few minutes within the same downtime it was already squeezed into
+    // must not suddenly promote it to the primary chair. Only truly standalone time (nobody
+    // else's stage anywhere nearby) earns primary.
+    actions.rescheduleAppointment(appointment.id, appointment.date, target, isSqueezedAt(appointments, appointment, target) ? "parallel" : "primary");
     if (landedOn) {
       const other = clients.find((c) => c.id === landedOn.clientId);
       announce(`Moved ${client.name} to ${formatClock(target)} — double-booked with ${other?.name ?? "another client"}`);
@@ -141,6 +143,12 @@ export function AppointmentCard({ appointment, lane }) {
     actions.openReschedule(appointment.id);
   }
 
+  function handleDelete(e) {
+    e.stopPropagation();
+    actions.deleteAppointment(appointment.id);
+    announce(`Removed ${client.name}'s cancelled appointment`);
+  }
+
   function handleFreeStageClick(e, stage) {
     e.stopPropagation();
     if (isPrivate) {
@@ -154,7 +162,7 @@ export function AppointmentCard({ appointment, lane }) {
 
   return (
     <div
-      className={`booking lane-${lane} ${stateClass} ${multiPhase ? "phased" : "simple"} ${isDragging ? "dragging" : ""} ${conflictClient ? "conflict" : ""}`}
+      className={`booking lane-${lane} ${stateClass} ${multiPhase ? "phased" : "simple"} ${isDragging ? "dragging" : ""} ${conflictClient ? "conflict" : ""} ${showControls ? "with-controls" : ""}`}
       style={{ top, height }}
       onClick={openClient}
       onPointerDown={handlePointerDown}
@@ -252,10 +260,33 @@ export function AppointmentCard({ appointment, lane }) {
         </div>
       )}
 
-      {isCancelled && (
-        <button className="chip-btn restore" title="Restore appointment" onClick={handleRestore}>
-          <Check /> Restore
-        </button>
+      {isCancelled && !confirmingDelete && (
+        <div className="cancelled-actions" onClick={(e) => e.stopPropagation()}>
+          <button className="chip-btn restore" title="Restore appointment" onClick={handleRestore}>
+            <Check /> Restore
+          </button>
+          <button
+            className="chip-btn restore danger"
+            title="Remove for good"
+            onClick={(e) => {
+              e.stopPropagation();
+              setConfirmingDelete(true);
+            }}
+          >
+            <Trash />
+          </button>
+        </div>
+      )}
+      {isCancelled && confirmingDelete && (
+        <div className="cancelled-actions confirm" onClick={(e) => e.stopPropagation()}>
+          <span>Remove for good?</span>
+          <button className="chip-btn restore danger" onClick={handleDelete}>
+            Yes, remove
+          </button>
+          <button className="chip-btn restore" onClick={(e) => { e.stopPropagation(); setConfirmingDelete(false); }}>
+            Cancel
+          </button>
+        </div>
       )}
     </div>
   );

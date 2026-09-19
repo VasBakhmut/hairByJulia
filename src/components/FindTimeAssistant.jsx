@@ -4,6 +4,7 @@ import { useAppActions, useAppState, useAnnounce } from "../store/AppContext.jsx
 import { NOW, dateKey, durationLabel, formatDayLabel, formatRange, keyToDate } from "../lib/format.js";
 import { snapAndClamp } from "../lib/geometry.js";
 import { appointmentDuration, findConflictingAppointment, lastAppointmentFor, searchAvailability } from "../lib/scheduling.js";
+import { ALL_SERVICES } from "../lib/services.js";
 
 const quickDurations = [45, 60, 90, 120];
 
@@ -33,6 +34,7 @@ export function FindTimeAssistant() {
   const [serviceQuery, setServiceQuery] = useState("");
   const [uninterrupted, setUninterrupted] = useState(false);
   const [showClientMatches, setShowClientMatches] = useState(false);
+  const [showServiceMatches, setShowServiceMatches] = useState(false);
   const [exactDate, setExactDate] = useState("");
   const [exactTime, setExactTime] = useState("");
 
@@ -69,7 +71,9 @@ export function FindTimeAssistant() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ui.assistantOpen, prefill]);
 
-  const slots = useMemo(() => searchAvailability(appointments, duration, NOW, { daysAhead: 14, limit: 8 }), [appointments, duration]);
+  // Four, not eight — a long list of near-identical "genuinely open" rows was making it easy to
+  // click one without quite registering which; fewer, clearer options.
+  const slots = useMemo(() => searchAvailability(appointments, duration, NOW, { daysAhead: 14, limit: 4 }), [appointments, duration]);
 
   const clientMatches = useMemo(() => {
     const q = clientQuery.trim().toLowerCase();
@@ -81,6 +85,12 @@ export function FindTimeAssistant() {
   }, [clients, clientQuery]);
 
   const matchingClient = clients.find((c) => c.name.toLowerCase() === clientQuery.trim().toLowerCase());
+
+  const serviceMatches = useMemo(() => {
+    const q = serviceQuery.trim().toLowerCase();
+    if (!q) return ALL_SERVICES.slice(0, 8);
+    return ALL_SERVICES.filter((s) => s.name.toLowerCase().includes(q)).slice(0, 8);
+  }, [serviceQuery]);
 
   // "How long does this actually take Anna" isn't a generic service preset — it's whatever it
   // took her last time (thick hair processes longer, fine hair less). Surface it as a one-tap
@@ -139,6 +149,11 @@ export function FindTimeAssistant() {
     if (client.prefersPrivate) setUninterrupted(true);
   }
 
+  function pickService(service) {
+    setServiceQuery(service.name);
+    setShowServiceMatches(false);
+  }
+
   function applyRecall(pastAppt) {
     if (pastAppt.stages.length >= 3) {
       setMultiStep(true);
@@ -153,22 +168,30 @@ export function FindTimeAssistant() {
     if (!serviceQuery.trim()) setServiceQuery(pastAppt.serviceLabel);
   }
 
+  // Both fields apply the moment they're both filled in — no separate "use this time" click to
+  // forget, which was the actual bug: type a time, forget to confirm it, and whatever was still
+  // selected from the list above gets booked instead. The "Selected time" line by the footer
+  // button is the one place that always says, plainly, what's about to be booked.
+  function applyExact(d, t) {
+    if (!d || !t) return;
+    const [h, m] = t.split(":").map(Number);
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return;
+    const startMin = snapAndClamp(h * 60 + m, duration);
+    setSelectedSlot({ date: d, startMin, endMin: startMin + duration });
+  }
+
   // Picking a date jumps the real calendar (visible right next to this panel on desktop) to
   // that day live, so she's looking at the actual schedule — not a re-derived text list that
   // can drift out of sync with what "that day" even means — while she settles on a time.
   function changeExactDate(value) {
     setExactDate(value);
     if (value) actions.setSelectedDate(keyToDate(value));
+    applyExact(value, exactTime);
   }
 
-  function useExactTime() {
-    if (!exactDate || !exactTime) {
-      announce("Pick a date and a time first");
-      return;
-    }
-    const [h, m] = exactTime.split(":").map(Number);
-    const startMin = snapAndClamp(h * 60 + m, duration);
-    setSelectedSlot({ date: exactDate, startMin, endMin: startMin + duration });
+  function changeExactTime(value) {
+    setExactTime(value);
+    applyExact(exactDate, value);
   }
 
   function confirm() {
@@ -243,7 +266,28 @@ export function FindTimeAssistant() {
             </div>
           )}
         </div>
-        <input placeholder="Service (e.g. Colour + Cut)" value={serviceQuery} onChange={(e) => setServiceQuery(e.target.value)} />
+        <div className="autocomplete">
+          <input
+            placeholder="Service (e.g. Colour + Cut)"
+            value={serviceQuery}
+            onFocus={() => setShowServiceMatches(true)}
+            onChange={(e) => {
+              setServiceQuery(e.target.value);
+              setShowServiceMatches(true);
+            }}
+            onBlur={() => window.setTimeout(() => setShowServiceMatches(false), 120)}
+          />
+          {showServiceMatches && serviceMatches.length > 0 && (
+            <div className="autocomplete-list">
+              {serviceMatches.map((s) => (
+                <button key={s.name} onMouseDown={() => pickService(s)}>
+                  {s.name}
+                  <small> · {s.price}</small>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="step">
@@ -382,8 +426,7 @@ export function FindTimeAssistant() {
           <small>Or asked for an exact day and time? Picking a date opens that day over on the calendar so you can see it.</small>
           <div className="exact-time-row">
             <input type="date" value={exactDate} onChange={(e) => changeExactDate(e.target.value)} />
-            <input type="time" step="300" value={exactTime} onChange={(e) => setExactTime(e.target.value)} />
-            <button type="button" onClick={useExactTime}>Use this time</button>
+            <input type="time" step="300" value={exactTime} onChange={(e) => changeExactTime(e.target.value)} />
           </div>
         </div>
 
@@ -398,7 +441,18 @@ export function FindTimeAssistant() {
       </div>
 
       <div className="assistant-footer">
-        <small>{clientQuery.trim() ? `Booking for ${clientQuery.trim()}.` : "No name yet? Book anyway — you'll be walked straight to adding it."}</small>
+        {/* The one place that always says plainly what's about to happen — picked from the
+            list, typed in exactly, or pinned from the calendar, this is the actual answer to
+            "what time am I booking", checked right before the button that commits it. */}
+        {selectedSlot ? (
+          <div className="selected-time-summary">
+            <span>Booking</span>
+            <b>{formatDayLabel(selectedSlot.date)} · {formatRange(selectedSlot.startMin, selectedSlot.endMin)}</b>
+          </div>
+        ) : (
+          <small>Pick a time above first.</small>
+        )}
+        <small>{clientQuery.trim() ? `For ${clientQuery.trim()}.` : "No name yet? Book anyway — you'll be walked straight to adding it."}</small>
         <button className="primary" disabled={!selectedSlot} onClick={confirm}>Book appointment</button>
       </div>
     </aside>

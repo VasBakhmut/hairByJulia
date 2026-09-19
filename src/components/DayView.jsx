@@ -71,14 +71,23 @@ function DesktopDayGrid({ date }) {
         </button>
         <div className="schedule-inner" style={{ height: SCHEDULE_HEIGHT, "--px-per-hour": `${PX_PER_HOUR}px` }}>
           <div className="time-column">
-            {HOURS.map((min) => (
-              <div key={min}>
-                <b>{formatHourLabel(min)}</b>
-                <span>:15</span>
-                <span>:30</span>
-                <span>:45</span>
-              </div>
-            ))}
+            {HOURS.map((min, i) => {
+              const { hour, ampm } = hourParts(min);
+              return (
+                <div key={min} className={`hour-block ${i % 2 === 1 ? "alt" : ""}`}>
+                  <div className="hour-num">
+                    <b>{hour}</b>
+                    <small>{ampm}</small>
+                  </div>
+                  <div className="quarter-col">
+                    <span>:00</span>
+                    <span>:15</span>
+                    <span>:30</span>
+                    <span>:45</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
           <div className="grid-bg" onClick={handleGridClick} />
 
@@ -104,7 +113,18 @@ function DesktopDayGrid({ date }) {
           ))}
 
           {openGaps.map((gap, i) => (
-            <div key={i} className="availability" style={{ top: minutesToPx(gap.start), height: Math.max((gap.end - gap.start) * PX_PER_MIN, 40) }}>
+            <div
+              key={i}
+              className="availability"
+              style={{ top: minutesToPx(gap.start), height: Math.max((gap.end - gap.start) * PX_PER_MIN, 40) }}
+              onClick={() => actions.openAssistant({ slot: { date: key, startMin: gap.start, maxDurationMin: gap.end - gap.start, context: "" } })}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) =>
+                (e.key === "Enter" || e.key === " ") &&
+                actions.openAssistant({ slot: { date: key, startMin: gap.start, maxDurationMin: gap.end - gap.start, context: "" } })
+              }
+            >
               Available
             </div>
           ))}
@@ -129,10 +149,11 @@ function DesktopDayGrid({ date }) {
   );
 }
 
-function formatHourLabel(min) {
+function hourParts(min) {
   const h24 = Math.floor(min / 60);
-  const h = h24 % 12 === 0 ? 12 : h24 % 12;
-  return `${h}:00`;
+  const hour = h24 % 12 === 0 ? 12 : h24 % 12;
+  const ampm = h24 < 12 ? "AM" : "PM";
+  return { hour, ampm };
 }
 function formatHourMinute(min) {
   const h24 = Math.floor(min / 60);

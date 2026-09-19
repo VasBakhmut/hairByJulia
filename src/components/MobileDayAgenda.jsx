@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { ArrowsClockwise, BellRinging, CaretDown, CaretUp, Check, Clock, LockSimple, LockSimpleOpen, Scissors, WarningCircle, X } from "@phosphor-icons/react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowsClockwise, BellRinging, CaretDown, CaretUp, Check, Clock, LockSimple, LockSimpleOpen, Scissors, Trash, WarningCircle, X } from "@phosphor-icons/react";
 import { useAppActions, useAppState, useAnnounce } from "../store/AppContext.jsx";
 import { addDays, NOW, dateKey, formatClock, formatRange, minutesSinceMidnight, sameDay } from "../lib/format.js";
 import { appointmentEndMin, findConflictingAppointment, layoutDay, stagesWithOffsets } from "../lib/scheduling.js";
@@ -75,6 +75,7 @@ function AgendaItem({ appointment }) {
   const actions = useAppActions();
   const announce = useAnnounce();
   const client = clients.find((c) => c.id === appointment.clientId);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   if (!client) return null;
 
   const isPrivate = !appointment.allowParallelBooking;
@@ -114,6 +115,11 @@ function AgendaItem({ appointment }) {
   function handleReschedule(e) {
     e.stopPropagation();
     actions.openReschedule(appointment.id);
+  }
+  function handleDelete(e) {
+    e.stopPropagation();
+    actions.deleteAppointment(appointment.id);
+    announce(`Removed ${client.name}'s cancelled appointment`);
   }
   function handleFreeStageClick(e, stage) {
     e.stopPropagation();
@@ -195,10 +201,32 @@ function AgendaItem({ appointment }) {
             <X />
           </button>
         </div>
+      ) : !confirmingDelete ? (
+        <div className="agenda-item-controls" onClick={(e) => e.stopPropagation()}>
+          <button className="chip-btn restore" title="Restore appointment" onClick={handleRestore}>
+            <Check /> Restore
+          </button>
+          <button
+            className="chip-btn restore danger"
+            title="Remove for good"
+            onClick={(e) => {
+              e.stopPropagation();
+              setConfirmingDelete(true);
+            }}
+          >
+            <Trash /> Remove
+          </button>
+        </div>
       ) : (
-        <button className="chip-btn restore" title="Restore appointment" onClick={handleRestore}>
-          <Check /> Restore
-        </button>
+        <div className="agenda-item-controls confirm" onClick={(e) => e.stopPropagation()}>
+          <span>Remove for good?</span>
+          <button className="chip-btn restore danger" onClick={handleDelete}>
+            Yes, remove
+          </button>
+          <button className="chip-btn restore" onClick={(e) => { e.stopPropagation(); setConfirmingDelete(false); }}>
+            Cancel
+          </button>
+        </div>
       )}
     </div>
   );

@@ -183,6 +183,22 @@ export function findConflictingAppointment(appointments, appt, atStartMin) {
 }
 
 /**
+ * Should `appt`, sitting at `atStartMin`, be shown in the parallel (squeezed-in) lane? Not just
+ * "does it clash" — landing cleanly *inside* someone else's free/processing stage is exactly
+ * the double-booking feature working, not a conflict, but it's still a squeeze and belongs in
+ * the side lane, not promoted to the main primary-chair timeline. Only genuinely standalone
+ * time — nobody else's stage anywhere nearby — earns "primary".
+ */
+export function isSqueezedAt(appointments, appt, atStartMin) {
+  if (findConflictingAppointment(appointments, appt, atStartMin)) return true;
+  const handsOnStages = stagesWithOffsets({ ...appt, startMin: atStartMin }).filter((s) => s.occupiesStylist);
+  if (handsOnStages.length === 0) return false;
+  const others = appointments.filter((a) => a.id !== appt.id);
+  const freeWindows = freeWindowsForDay(others, appt.date);
+  return handsOnStages.some((s) => freeWindows.some((fw) => s.start < fw.end && s.start + s.durationMin > fw.start));
+}
+
+/**
  * Assigns each of the day's appointments to the primary chair lane or the parallel
  * (squeezed-in) lane. The lane is decided at booking time (`appt.lane`) rather than
  * inferred geometrically, matching how Julia actually thinks about it: a booking either
